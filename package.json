@@ -10,7 +10,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
   },
   "dependencies": {
-    "@marcosousapoza/turing-machine-wasm": "^0.1.0"
+    "@marcosousapoza/turing-machine-wasm": "https://registry.npmjs.org/@marcosousapoza/turing-machine-wasm/-/turing-machine-wasm-0.1.0.tgz"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
