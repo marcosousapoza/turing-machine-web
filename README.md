@@ -15,6 +15,8 @@ The core machine model and notation follow Michael Sipser's *Introduction to the
 - Local `.tm` files and a remote community program explorer
 - Lazily fetched, automatically namespaced function imports
 - Declarative pause states at composition boundaries
+- A fixed 32-bit MSB-first registry ABI with composable word primitives
+- Collapsible registry categories
 - Sanitized Markdown documentation dialogs from `///` comments
 - Animated execution and immediate run-to-completion
 - Light and dark themes matching the shadcn-svelte Claude theme

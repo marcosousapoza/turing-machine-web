@@ -56,19 +56,16 @@ A function has the same state-machine structure but declares `function` instead 
 ```tm
 model sipser-3e;
 
-/// Negates one bit and returns the head to that bit.
-function Not;
+/// Moves one cell to the right without changing the tape.
+function NextBit;
 
 start q0;
 accept q_accept;
 reject q_reject;
 
-q0, "0" -> q_return, "1", R;
-q0, "1" -> q_return, "0", R;
-q0, blank -> q_reject, blank, R;
-q_return, "0" -> q_reject, "0", R;
-q_return, "1" -> q_reject, "1", R;
-q_return, blank -> q_accept, blank, L;
+q0, "0" -> q_accept, "0", R;
+q0, "1" -> q_accept, "1", R;
+q0, blank -> q_accept, blank, R;
 ```
 
 Every function must document its tape and head contract. A function receives the tape and head exactly as the previous function left them. It may rewrite any cells. The write and movement of the transition that enters its accept state happen before the next function begins.
@@ -80,7 +77,7 @@ Each `.tm` file contains exactly one program or function. Imports name functions
 ```tm
 model sipser-3e;
 
-/// Negates a bit twice.
+/// Negates a 32-bit MSB-first word twice.
 program DoubleNot;
 
 import "logic/not.tm" as first;
@@ -117,10 +114,10 @@ Registry paths encode categories:
 
 ```text
 programs/
-  examples/
   logic/
   math/
   predicates/
+  primitives/
 ```
 
 The catalog exposes each path, category, unit kind, example input, and description. The Studio explorer groups entries by category. Opening an entry edits it directly; the plus button creates a program that imports and includes a function.
@@ -131,10 +128,10 @@ Lines beginning with `///` attach Markdown documentation to the following `progr
 
 ```tm
 /// ## Contract
-/// Reads two bits beginning at the head.
+/// Reads two 32-bit words beginning at the head.
 ///
-/// Returns one result bit with the head on that bit.
-function And;
+/// Writes the result into the next word and moves the head there.
+function And32;
 ```
 
 Machine and current-state documentation opens in a sanitized Markdown dialog. Use `//` for comments that should not become documentation.
@@ -151,6 +148,14 @@ The input control accepts an explicit encoding or auto-detects `0b` and `0x` pre
 | `42` as Decimal | `101010` |
 
 All encodings produce only binary tape data. Hexadecimal input preserves four bits per digit, including leading zeroes.
+
+## Registry word ABI
+
+Standard registry functions operate on fixed 32-bit words ordered most-significant bit first. Hexadecimal input is the most concise way to preserve word width: `0x00000001` produces exactly one word.
+
+Unary transforming operations such as NOT and increment update the word under the head and return to its most-significant bit. Binary operations read two adjacent words, preserve the first, write the result into the second, and finish on the second word's most-significant bit. This allows subsequent binary operations to consume the result and the following word without moving existing tape data. Predicates and navigation primitives define their head movement in their individual contracts.
+
+The `primitives/` category provides functions for moving to adjacent words, clearing a word, and validating word width.
 
 ## Execution and output
 

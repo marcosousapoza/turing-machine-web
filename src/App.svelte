@@ -47,7 +47,7 @@
   const CATALOG_URL = 'https://raw.githubusercontent.com/marcosousapoza/turing-machine-programs/main/catalog.json'
   const starter = `model sipser-3e;
 
-/// Composes two imported NOT functions into one program.
+/// Negates one 32-bit MSB-first word twice.
 program DoubleNot;
 
 import "logic/not.tm" as first;
@@ -67,13 +67,14 @@ reject q_reject;`
   let source = starter
   let mainSource = starter
   let activeFile = 'main.tm'
-  let input = '0b1'
+  let input = '0x00000001'
   let inputEncoding: TapeEncoding = 'auto'
   let tapeFormat: TapeFormat = 'binary'
   let machine: Runtime | null = null
   let snapshot: Snapshot | null = null
   let definition: Definition | null = null
   let catalog: CatalogProgram[] = []
+  let openCategories = new Set<string>()
   let localFiles = new Map<string, string>()
   let error = ''
   let ready = false
@@ -114,6 +115,13 @@ reject q_reject;`
     const response = await fetch(CATALOG_URL)
     if (!response.ok) throw new Error(`Could not load program catalog (${response.status}).`)
     catalog = ((await response.json()) as Catalog).programs
+  }
+
+  function toggleCategory(category: string): void {
+    const next = new Set(openCategories)
+    if (next.has(category)) next.delete(category)
+    else next.add(category)
+    openCategories = next
   }
 
   function message(value: unknown): string {
@@ -367,19 +375,27 @@ reject q_reject;`
           <p class="px-2 py-3 text-xs text-muted-foreground">Loading registry…</p>
         {/if}
         {#each categories as category}
-          <p class="mt-2 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{category}</p>
-          {#each catalog.filter((program) => program.category === category) as program}
-            <div class="group flex items-center gap-1 rounded-lg hover:bg-accent">
-              <button class="file-row min-w-0 flex-1 hover:!bg-transparent" onclick={() => openProgram(program)} title={program.description}>
-                <ChevronRight class="size-4 shrink-0 text-muted-foreground" />
-                <span class="truncate">{program.name}</span>
-                <span class="ml-auto text-[9px] uppercase text-muted-foreground">{program.kind}</span>
-              </button>
-              {#if program.kind === 'function'}
-                <button class="mr-1 hidden size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-background hover:text-foreground group-hover:flex" onclick={() => importProgram(program)} aria-label={`Import ${program.name}`} title={`Create a program with ${program.path}`}><Plus class="size-3.5" /></button>
-              {/if}
+          <button class="file-row mt-1 font-semibold" onclick={() => toggleCategory(category)} aria-expanded={openCategories.has(category)}>
+            <ChevronRight class={`size-4 shrink-0 text-muted-foreground transition-transform ${openCategories.has(category) ? 'rotate-90' : ''}`} />
+            <span>{category}</span>
+            <span class="ml-auto text-[10px] text-muted-foreground">{catalog.filter((program) => program.category === category).length}</span>
+          </button>
+          {#if openCategories.has(category)}
+            <div class="ml-3 border-l border-border pl-1">
+              {#each catalog.filter((program) => program.category === category) as program}
+                <div class="group flex items-center gap-1 rounded-lg hover:bg-accent">
+                  <button class="file-row min-w-0 flex-1 hover:!bg-transparent" onclick={() => openProgram(program)} title={program.description}>
+                    <FileCode class="size-4 shrink-0 text-muted-foreground" />
+                    <span class="truncate">{program.name}</span>
+                    <span class="ml-auto text-[9px] uppercase text-muted-foreground">{program.kind}</span>
+                  </button>
+                  {#if program.kind === 'function'}
+                    <button class="mr-1 hidden size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-background hover:text-foreground group-hover:flex" onclick={() => importProgram(program)} aria-label={`Import ${program.name}`} title={`Create a program with ${program.path}`}><Plus class="size-3.5" /></button>
+                  {/if}
+                </div>
+              {/each}
             </div>
-          {/each}
+          {/if}
         {/each}
       </div>
     </aside>
