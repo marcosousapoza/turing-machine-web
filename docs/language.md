@@ -154,7 +154,7 @@ All encodings produce only binary tape data. Hexadecimal input preserves four bi
 
 ## Execution and output
 
-`Run` animates execution at the selected speed. `Run to completion` executes immediately with a one-million-transition safety limit and stops at declared pauses. For a standalone machine, Step performs one transition. For a composition, Step executes the current function through its accepting or rejecting state.
+`Run` animates execution at the selected speed and stops at declared pauses. `Run to completion` bypasses pauses and executes immediately with a one-million-transition safety limit. For a standalone machine, Step performs one transition. For a composition, Step executes the current function through its accepting or rejecting state.
 
 The single Tape value inspector is both the live value and final output. It supports UTF-8, binary, decimal, and hexadecimal formats. UTF-8 requires complete valid bytes. Blank cells at the end are omitted, and a tape without binary content is displayed as `Empty`.
 

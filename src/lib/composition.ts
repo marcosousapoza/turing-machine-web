@@ -116,7 +116,7 @@ export class CompositeMachine {
   async run(maxSteps: number): Promise<string> {
     if (this.current.paused) this.current = { ...this.current, paused: false }
     const target = this.current.steps + maxSteps
-    while (!this.current.halted && !this.current.paused && this.current.steps < target) {
+    while (!this.current.halted && this.current.steps < target) {
       await this.enterCurrentBlock()
       const result = readSnapshot(this.machine.run(Math.min(target - this.current.steps, 0xffff_ffff)))
       if (!result.halted) {
@@ -124,6 +124,7 @@ export class CompositeMachine {
         break
       }
       this.finishBlock(result)
+      if (this.current.paused) this.current = { ...this.current, paused: false }
     }
     return this.snapshot()
   }
