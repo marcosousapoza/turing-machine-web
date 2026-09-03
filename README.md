@@ -1,6 +1,20 @@
 # Turing Machine Studio
 
-A Svelte and TypeScript workbench for writing, running, and sharing deterministic Turing machines. Execution is powered by the Rust package [`@marcosousapoza/turing-machine-wasm`](https://www.npmjs.com/package/@marcosousapoza/turing-machine-wasm).
+A Svelte 5 and TypeScript workbench for deterministic, single-tape Turing machines. Execution is powered by the Rust/WASM package [`@marcosousapoza/turing-machine-wasm`](https://www.npmjs.com/package/@marcosousapoza/turing-machine-wasm).
+
+The core machine model and notation follow Michael Sipser's *Introduction to the Theory of Computation*, 3rd edition, Section 3.1. Imports and documentation comments are explicit Studio extensions.
+
+## Features
+
+- Sipser-compatible machine definitions with validated input and tape alphabets
+- One-way-infinite tape with explicit accept and reject states
+- Step, run, pause, reset, and speed controls
+- String, binary, decimal, and hexadecimal tape views
+- Text, binary, decimal, and hexadecimal initial input
+- Local `.tm` files and a remote community program explorer
+- Recursive `import "program.tm";` resolution
+- Hover documentation from `///` comments
+- Light and dark themes matching the shadcn-svelte Claude theme
 
 ## Run locally
 
@@ -9,21 +23,9 @@ npm install
 npm run dev
 ```
 
-## Machine syntax
+See the [language reference](docs/language.md) for the complete syntax and semantics.
 
-```text
-start scan
-halt done
-blank _
-
-scan 0 -> scan 0 R
-scan 1 -> scan 1 R
-scan _ -> done _ S
-```
-
-Transitions use `state read -> next-state write movement`. Movement may be `L`, `R`, or `S`. The tape starts at cell zero and is infinite to the right.
-
-Machine files can be opened and saved from the editor. To contribute a reusable machine, add its `.tm` file to [`machines/`](./machines) in a pull request.
+Community machines live in [`turing-machine-programs`](https://github.com/marcosousapoza/turing-machine-programs).
 
 ## Checks
 

@@ -10,14 +10,18 @@
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
   },
   "dependencies": {
-    "@marcosousapoza/turing-machine-wasm": "https://registry.npmjs.org/@marcosousapoza/turing-machine-wasm/-/turing-machine-wasm-0.1.0.tgz"
+    "@lucide/svelte": "^1.40.0",
+    "@marcosousapoza/turing-machine-wasm": "0.2.1",
+    "mode-watcher": "^1.1.0"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "@tailwindcss/vite": "^4.3.3",
     "@tsconfig/svelte": "^5.0.8",
     "@types/node": "^24.13.3",
     "svelte": "^5.56.10",
     "svelte-check": "^4.7.6",
+    "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
     "vite": "^8.2.2"
   }
