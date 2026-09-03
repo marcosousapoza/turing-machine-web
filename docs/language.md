@@ -17,6 +17,11 @@ M = (Q, \Sigma, \Gamma, \delta, q_0, q_{accept}, q_{reject})
 - The transition function is defined for every nonhalting state and tape-alphabet symbol.
 - The transition function uses only `L` and `R`. Sipser's core model has no stay-put move.
 
+The notation deliberately distinguishes two concepts commonly used in textbooks:
+
+- `ε` is the empty word, a string of length zero. It is displayed by formatted input and output helpers but never occupies a tape cell.
+- `blank` is the reserved language token for a blank tape cell and is displayed as `⊔`.
+
 Imports and documentation comments are Studio language extensions and do not change the machine model.
 
 ## Complete example
@@ -93,16 +98,18 @@ The input control accepts an explicit encoding or auto-detects `0b` and `0x` pre
 
 | Input | Decoded tape |
 | --- | --- |
-| `hello` as String | `hello` |
+| `hello` as String | `0110100001100101011011000110110001101111` (UTF-8) |
 | `0b1010` | `1010` |
 | `0x2a` | `00101010` |
 | `42` as Decimal | `101010` |
 
-Hexadecimal input preserves four bits per digit, including leading zeroes. Decoded symbols must belong to the machine's input alphabet.
+String input is encoded as UTF-8 bytes and written as eight binary symbols per byte. This lets machines compose around one binary representation instead of placing JavaScript characters directly on the tape. Hexadecimal input preserves four bits per digit, including leading zeroes. Decoded symbols must belong to the machine's input alphabet.
 
 ## Tape output
 
-The live tape and halted output can independently be displayed as String, Binary, Decimal, or Hexadecimal. Numeric formats require a tape containing only `0` and `1`; trailing blank symbols are omitted.
+The live tape and halted output can independently be displayed as String, Binary, Decimal, or Hexadecimal. String output decodes complete groups of eight bits as UTF-8 and reports incomplete or invalid sequences. Numeric formats require a tape containing only `0` and `1`; trailing blank symbols are omitted. A tape with no nonblank content is displayed as `ε`.
+
+The visual tape always shows a 16-cell window. It begins at cell zero and follows the head once execution moves beyond the first eight cells; this is only a viewport over the right-infinite tape.
 
 ## References
 

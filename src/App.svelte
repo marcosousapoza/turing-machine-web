@@ -61,7 +61,7 @@ import "binary-complement.tm";`
   let activeFile = 'main.tm'
   let input = '0x2d'
   let inputEncoding: TapeEncoding = 'auto'
-  let tapeFormat: TapeFormat = 'string'
+  let tapeFormat: TapeFormat = 'binary'
   let outputFormat: TapeFormat = 'hex'
   let machine: Machine | null = null
   let snapshot: Snapshot | null = null
@@ -79,6 +79,7 @@ import "binary-complement.tm";`
   $: currentStateDocs = definition?.states.find((state) => state.name === snapshot?.state)?.docs
   $: currentTape = snapshot ? formatTape(snapshot.tape, tapeFormat, definition?.blank) : '—'
   $: output = snapshot?.halted ? formatTape(snapshot.tape, outputFormat, definition?.blank) : 'Run the machine to completion'
+  $: visibleTape = tapeWindow(snapshot, definition?.blank ?? '⊔')
 
   onMount(() => {
     void Promise.all([initWasm(), loadCatalog()]).then(async () => {
@@ -102,6 +103,14 @@ import "binary-complement.tm";`
 
   function readSnapshot(value: string): Snapshot {
     return JSON.parse(value) as Snapshot
+  }
+
+  function tapeWindow(current: Snapshot | null, blank: string): { index: number; symbol: string }[] {
+    const start = Math.max(0, (current?.head ?? 0) - 7)
+    return Array.from({ length: 16 }, (_, offset) => {
+      const index = start + offset
+      return { index, symbol: current?.tape[index] ?? blank }
+    })
   }
 
   async function compile(): Promise<void> {
@@ -324,7 +333,7 @@ import "binary-complement.tm";`
         <div class="grid gap-3 p-4 sm:grid-cols-[140px_minmax(0,1fr)]">
           <label class="field-label">Encoding
             <select bind:value={inputEncoding}>
-              <option value="auto">Auto-detect</option><option value="text">String</option><option value="binary">Binary</option><option value="hex">Hexadecimal</option><option value="decimal">Decimal</option>
+              <option value="auto">Auto-detect</option><option value="text">String (UTF-8)</option><option value="binary">Binary</option><option value="hex">Hexadecimal</option><option value="decimal">Decimal</option>
             </select>
           </label>
           <label class="field-label">Initial tape
@@ -339,7 +348,7 @@ import "binary-complement.tm";`
           <div class="flex items-center gap-3">
             <div>
               <h2 class="text-sm font-semibold">Tape</h2>
-              <p class="text-xs text-muted-foreground">One-way infinite to the right</p>
+              <p class="text-xs text-muted-foreground">16-cell viewport · <span class="font-mono">⊔</span> blank · <span class="font-mono">ε</span> empty word</p>
             </div>
             {#if snapshot}
               <span class:accepted={snapshot.accepted} class:rejected={snapshot.rejected} class="status-pill">{snapshot.accepted ? 'Accepted' : snapshot.rejected ? 'Rejected' : running ? 'Running' : 'Ready'}</span>
@@ -353,11 +362,8 @@ import "binary-complement.tm";`
 
         <div class="tape-scroll">
           <div class="flex min-w-max gap-1 p-6 sm:p-8">
-            {#each snapshot?.tape ?? ['⊔'] as symbol, index}
-              <div class:head-cell={index === snapshot?.head} class="tape-cell"><span>{index}</span><strong>{symbol}</strong></div>
-            {/each}
-            {#each Array(4) as _, offset}
-              <div class="tape-cell opacity-45"><span>{(snapshot?.tape.length ?? 1) + offset}</span><strong>{definition?.blank ?? '⊔'}</strong></div>
+            {#each visibleTape as cell}
+              <div class:head-cell={cell.index === snapshot?.head} class:blank-cell={cell.symbol === (definition?.blank ?? '⊔')} class="tape-cell"><span>{cell.index}</span><strong>{cell.symbol}</strong></div>
             {/each}
           </div>
         </div>
@@ -372,11 +378,11 @@ import "binary-complement.tm";`
 
       <section class="grid gap-4 md:grid-cols-2">
         <article class="card p-4">
-          <div class="mb-4 flex items-center justify-between"><div><h2 class="text-sm font-semibold">Current tape</h2><p class="text-xs text-muted-foreground">Live formatted value</p></div><select class="compact-select" bind:value={tapeFormat}><option value="string">String</option><option value="binary">Binary</option><option value="decimal">Decimal</option><option value="hex">Hex</option></select></div>
+          <div class="mb-4 flex items-center justify-between"><div><h2 class="text-sm font-semibold">Current tape</h2><p class="text-xs text-muted-foreground">String uses UTF-8</p></div><select class="compact-select" bind:value={tapeFormat}><option value="string">String (UTF-8)</option><option value="binary">Binary</option><option value="decimal">Decimal</option><option value="hex">Hex</option></select></div>
           <output class="value-output">{currentTape}</output>
         </article>
         <article class="card p-4">
-          <div class="mb-4 flex items-center justify-between"><div><h2 class="text-sm font-semibold">Output</h2><p class="text-xs text-muted-foreground">Available after halt</p></div><select class="compact-select" bind:value={outputFormat}><option value="string">String</option><option value="binary">Binary</option><option value="decimal">Decimal</option><option value="hex">Hex</option></select></div>
+          <div class="mb-4 flex items-center justify-between"><div><h2 class="text-sm font-semibold">Output</h2><p class="text-xs text-muted-foreground">Available after halt</p></div><select class="compact-select" bind:value={outputFormat}><option value="string">String (UTF-8)</option><option value="binary">Binary</option><option value="decimal">Decimal</option><option value="hex">Hex</option></select></div>
           <output class:muted-output={!snapshot?.halted} class="value-output">{output}</output>
         </article>
       </section>

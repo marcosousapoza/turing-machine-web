@@ -9,8 +9,9 @@ The core machine model and notation follow Michael Sipser's *Introduction to the
 - Sipser-compatible machine definitions with validated input and tape alphabets
 - One-way-infinite tape with explicit accept and reject states
 - Step, run, pause, reset, and speed controls
-- String, binary, decimal, and hexadecimal tape views
-- Text, binary, decimal, and hexadecimal initial input
+- UTF-8 string, binary, decimal, and hexadecimal tape views
+- UTF-8 string, binary, decimal, and hexadecimal initial input
+- A fixed 16-cell tape viewport that follows the head
 - Local `.tm` files and a remote community program explorer
 - Recursive `import "program.tm";` resolution
 - Hover documentation from `///` comments

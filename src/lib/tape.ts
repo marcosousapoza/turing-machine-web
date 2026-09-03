@@ -8,7 +8,11 @@ export function decodeTape(value: string, encoding: TapeEncoding): string {
         : 'text'
     : encoding
 
-  if (selected === 'text') return value
+  if (selected === 'text') {
+    return [...new TextEncoder().encode(value)]
+      .map((byte) => byte.toString(2).padStart(8, '0'))
+      .join('')
+  }
   const compact = value.replaceAll(/\s|_/g, '')
   if (selected === 'binary') {
     const binary = compact.replace(/^0b/i, '')
@@ -30,8 +34,17 @@ export function tapeContent(tape: string[], blank = '⊔'): string {
 
 export function formatTape(tape: string[], format: TapeFormat, blank = '⊔'): string {
   const content = tapeContent(tape, blank)
-  if (format === 'string') return content || '∅'
-  if (!content || /[^01]/.test(content)) return 'Not a binary tape'
+  if (!content) return 'ε'
+  if (/[^01]/.test(content)) return format === 'string' ? 'Not UTF-8 encoded' : 'Not a binary tape'
+  if (format === 'string') {
+    if (content.length % 8 !== 0) return `Incomplete UTF-8 byte (${content.length} bits)`
+    const bytes = Uint8Array.from(content.match(/.{8}/g) ?? [], (byte) => Number.parseInt(byte, 2))
+    try {
+      return new TextDecoder('utf-8', { fatal: true }).decode(bytes) || 'ε'
+    } catch {
+      return 'Invalid UTF-8 sequence'
+    }
+  }
   if (format === 'binary') return `0b${content}`
   const value = BigInt(`0b${content}`)
   if (format === 'decimal') return value.toString(10)

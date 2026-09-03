@@ -152,6 +152,7 @@
 
 .tape-cell span { position: absolute; top: -18px; color: var(--muted-foreground); font: 10px var(--font-mono); }
 .tape-cell strong { font: 500 18px var(--font-mono); }
+.tape-cell.blank-cell { color: var(--muted-foreground); background: color-mix(in oklch, var(--muted) 60%, transparent); }
 .tape-cell.head-cell { color: var(--primary-foreground); border-color: var(--primary); background: var(--primary); transform: translateY(-4px); }
 .tape-cell.head-cell::after { content: 'HEAD'; position: absolute; bottom: -19px; color: var(--primary); font: 600 9px var(--font-mono); }
 
