@@ -34,13 +34,13 @@ export function tapeContent(tape: string[], blank = '⊔'): string {
 
 export function formatTape(tape: string[], format: TapeFormat, blank = '⊔'): string {
   const content = tapeContent(tape, blank)
-  if (!content) return 'ε'
+  if (!content) return 'Empty'
   if (/[^01]/.test(content)) return format === 'string' ? 'Not UTF-8 encoded' : 'Not a binary tape'
   if (format === 'string') {
     if (content.length % 8 !== 0) return `Incomplete UTF-8 byte (${content.length} bits)`
     const bytes = Uint8Array.from(content.match(/.{8}/g) ?? [], (byte) => Number.parseInt(byte, 2))
     try {
-      return new TextDecoder('utf-8', { fatal: true }).decode(bytes) || 'ε'
+      return new TextDecoder('utf-8', { fatal: true }).decode(bytes) || 'Empty'
     } catch {
       return 'Invalid UTF-8 sequence'
     }

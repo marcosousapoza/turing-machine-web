@@ -6,15 +6,17 @@ The core machine model and notation follow Michael Sipser's *Introduction to the
 
 ## Features
 
-- Sipser-compatible machine definitions with validated input and tape alphabets
+- Sipser-compatible machines with an implicit binary input/output alphabet
 - One-way-infinite tape with explicit accept and reject states
-- Step, run, pause, reset, and speed controls
+- Transition-level stepping for standalone machines and function-level stepping for compositions
 - UTF-8 string, binary, decimal, and hexadecimal tape views
 - UTF-8 string, binary, decimal, and hexadecimal initial input
 - A fixed 16-cell tape viewport that follows the head
 - Local `.tm` files and a remote community program explorer
-- Recursive `import "program.tm";` resolution
-- Hover documentation from `///` comments
+- Lazily fetched, automatically namespaced function imports
+- Declarative pause states at composition boundaries
+- Sanitized Markdown documentation dialogs from `///` comments
+- Animated execution and immediate run-to-completion
 - Light and dark themes matching the shadcn-svelte Claude theme
 
 ## Run locally
@@ -32,5 +34,6 @@ Community machines live in [`turing-machine-programs`](https://github.com/marcos
 
 ```sh
 npm run check
+npm test
 npm run build
 ```

@@ -1,45 +1,41 @@
 # Turing Machine Language
 
-## Model
+## Machine model
 
-The execution model follows Michael Sipser's deterministic, single-tape Turing machine from *Introduction to the Theory of Computation*, 3rd edition, Section 3.1:
-
-\[
-M = (Q, \Sigma, \Gamma, \delta, q_0, q_{accept}, q_{reject})
-\]
+Execution follows Michael Sipser's deterministic, single-tape Turing machine from *Introduction to the Theory of Computation*, 3rd edition, Section 3.1.
 
 - The tape has a left endpoint and is infinite to the right.
-- The head starts on the leftmost input symbol, or the leftmost blank for empty input.
+- The head starts on the leftmost input bit, or the leftmost blank for empty input.
 - Moving left at the tape boundary leaves the head in place.
-- `blank` is in the tape alphabet Γ and not in the input alphabet Σ.
-- The input alphabet Σ must be a subset of Γ.
-- The accept and reject states are distinct and halt immediately.
-- The transition function is defined for every nonhalting state and tape-alphabet symbol.
-- The transition function uses only `L` and `R`. Sipser's core model has no stay-put move.
+- `blank`, displayed as `⊔`, is the only nonbinary tape symbol.
+- Accept and reject states are distinct and halt immediately.
+- The transition function is defined for every nonhalting state and all three tape symbols.
+- Transitions use only `L` and `R`; Sipser's core model has no stay-put move.
 
-The notation deliberately distinguishes two concepts commonly used in textbooks:
+The binary data alphabet is implicit and cannot be changed:
 
-- `ε` is the empty word, a string of length zero. It is displayed by formatted input and output helpers but never occupies a tape cell.
-- `blank` is the reserved language token for a blank tape cell and is displayed as `⊔`.
+```text
+input = output = { 0, 1 }
+tape = { 0, 1, blank }
+```
 
-Imports and documentation comments are Studio language extensions and do not change the machine model.
+Imports, endpoint inclusion, functions, and Markdown documentation are Studio extensions around that machine model.
 
-## Complete example
+## Programs
+
+A program is directly executable and owns its transitions:
 
 ```tm
 model sipser-3e;
 
-/// Decides whether a binary input contains at least one 1.
-machine ContainsOne;
-
-input_alphabet { "0", "1" };
-tape_alphabet { "0", "1", blank };
+/// Accepts when the input contains a `1`.
+program ContainsOne;
 
 start q0;
 accept q_accept;
 reject q_reject;
 
-/// Search the input from left to right.
+/// Search from left to right.
 state q0;
 
 q0, "0" -> q0, "0", R;
@@ -47,69 +43,122 @@ q0, "1" -> q_accept, "1", R;
 q0, blank -> q_reject, blank, R;
 ```
 
-The transition notation mirrors Sipser's tuple order:
+The transition notation is `δ(q, a) = (r, b, direction)`:
 
 ```text
-current_state, read_symbol -> next_state, write_symbol, direction;
+current_state, read_symbol -> next_state, write_symbol, L|R;
 ```
 
-This represents `δ(current_state, read_symbol) = (next_state, write_symbol, direction)`.
+## Functions
 
-## Declarations
+A function has the same state-machine structure but declares `function` instead of `program`:
 
-| Declaration | Meaning |
-| --- | --- |
-| `model sipser-3e;` | Selects the language's Sipser-compatible profile. |
-| `machine Name;` | Gives the machine an identifier. |
-| `input_alphabet { "0", "1" };` | Defines Σ. Symbols contain exactly one Unicode character. |
-| `tape_alphabet { "0", "1", blank };` | Defines Γ. It must include `blank` and every input symbol. |
-| `start q0;` | Declares the initial state. |
-| `accept q_accept;` | Declares the accepting halt state. |
-| `reject q_reject;` | Declares the rejecting halt state. |
-| `state q0;` | Optionally declares a state so documentation can be attached. |
+```tm
+model sipser-3e;
 
-State identifiers begin with an ASCII letter or underscore and may contain ASCII letters, digits, and underscores.
+/// Negates one bit and returns the head to that bit.
+function Not;
+
+start q0;
+accept q_accept;
+reject q_reject;
+
+q0, "0" -> q_return, "1", R;
+q0, "1" -> q_return, "0", R;
+q0, blank -> q_reject, blank, R;
+q_return, "0" -> q_reject, "0", R;
+q_return, "1" -> q_reject, "1", R;
+q_return, blank -> q_accept, blank, L;
+```
+
+Every function must document its tape and head contract. A function receives the tape and head exactly as the previous function left them. It may rewrite any cells. The write and movement of the transition that enters its accept state happen before the next function begins.
+
+## Loading and composition
+
+Each `.tm` file contains exactly one program or function. Imports name functions without copying their states into the source file:
+
+```tm
+model sipser-3e;
+
+/// Negates a bit twice.
+program DoubleNot;
+
+import "logic/not.tm" as first;
+import "logic/not.tm" as second;
+
+include first.start as q0;
+include first.accept as q1;
+include second.start as q1;
+include second.accept as q_accept;
+
+pause q1;
+
+start q0;
+accept q_accept;
+reject q_reject;
+```
+
+The loader performs these steps:
+
+1. Parse the composite declarations without fetching imported files.
+2. Resolve a function from uploaded local files or the public registry only when execution reaches its included start state.
+3. Assign the import instance a generated namespace and parse it as one concrete machine.
+4. Rename internal states, such as `__tm_0_first__q_return`, so lazily loaded functions cannot collide.
+5. Replace the previous transition table while retaining the tape, head position, and cumulative step count.
+6. Release the fetched source and previous function after the replacement.
+
+Every import includes its `start` and `accept` interface states. Giving two endpoints the same name merges them. In the example, `first.accept` and `second.start` both become `q1`, joining the two functions. A function's reject state always rejects the complete program and is not exported. The same file may be imported more than once under different aliases.
+
+The composite program declares its public `start`, `accept`, and `reject` states. `pause state;` stops after the preceding function accepts and before the function mapped to that state begins. Step or Run resumes from that boundary.
+
+## Repository hierarchy
+
+Registry paths encode categories:
+
+```text
+programs/
+  examples/
+  logic/
+  math/
+  predicates/
+```
+
+The catalog exposes each path, category, unit kind, example input, and description. The Studio explorer groups entries by category. Opening an entry edits it directly; the plus button creates a program that imports and includes a function.
 
 ## Documentation
 
-Lines beginning with `///` attach documentation to the following `machine`, `state`, or transition declaration. Consecutive lines form one documentation string.
+Lines beginning with `///` attach Markdown documentation to the following `program`, `function`, `state`, or transition. Consecutive lines form one documentation string.
 
 ```tm
-/// Scan right until the first blank.
-/// This state preserves every input symbol.
-state q_scan;
+/// ## Contract
+/// Reads two bits beginning at the head.
+///
+/// Returns one result bit with the head on that bit.
+function And;
 ```
 
-Machine and current-state documentation appears as a styled hover tooltip in the Studio. Use `//` for comments that should not become documentation.
-
-## Imports
-
-```tm
-import "binary-complement.tm";
-```
-
-Imports are textual includes resolved before WASM compilation. Resolution checks uploaded local files first and then the public [`turing-machine-programs`](https://github.com/marcosousapoza/turing-machine-programs) registry. Relative paths are allowed, `..` traversal is rejected, nested imports are supported, and cycles produce an error.
-
-A source containing only one import runs the imported standalone machine. Imported fragments may also contribute declarations and transitions, but duplicate machine-level declarations are rejected.
+Machine and current-state documentation opens in a sanitized Markdown dialog. Use `//` for comments that should not become documentation.
 
 ## Tape input
 
 The input control accepts an explicit encoding or auto-detects `0b` and `0x` prefixes:
 
-| Input | Decoded tape |
+| Input | Binary tape |
 | --- | --- |
-| `hello` as String | `0110100001100101011011000110110001101111` (UTF-8) |
+| `hello` as UTF-8 | `0110100001100101011011000110110001101111` |
 | `0b1010` | `1010` |
 | `0x2a` | `00101010` |
 | `42` as Decimal | `101010` |
 
-String input is encoded as UTF-8 bytes and written as eight binary symbols per byte. This lets machines compose around one binary representation instead of placing JavaScript characters directly on the tape. Hexadecimal input preserves four bits per digit, including leading zeroes. Decoded symbols must belong to the machine's input alphabet.
+All encodings produce only binary tape data. Hexadecimal input preserves four bits per digit, including leading zeroes.
 
-## Tape output
+## Execution and output
 
-The live tape and halted output can independently be displayed as String, Binary, Decimal, or Hexadecimal. String output decodes complete groups of eight bits as UTF-8 and reports incomplete or invalid sequences. Numeric formats require a tape containing only `0` and `1`; trailing blank symbols are omitted. A tape with no nonblank content is displayed as `ε`.
+`Run` animates execution at the selected speed. `Run to completion` executes immediately with a one-million-transition safety limit and stops at declared pauses. For a standalone machine, Step performs one transition. For a composition, Step executes the current function through its accepting or rejecting state.
 
-The visual tape always shows a 16-cell window. It begins at cell zero and follows the head once execution moves beyond the first eight cells; this is only a viewport over the right-infinite tape.
+The single Tape value inspector is both the live value and final output. It supports UTF-8, binary, decimal, and hexadecimal formats. UTF-8 requires complete valid bytes. Blank cells at the end are omitted, and a tape without binary content is displayed as `Empty`.
+
+The visual tape always shows a 16-cell window that follows the head. This is only a viewport over the right-infinite tape.
 
 ## References
 
