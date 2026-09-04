@@ -7,17 +7,14 @@ Execution follows Michael Sipser's deterministic, single-tape Turing machine fro
 - The tape has a left endpoint and is infinite to the right.
 - The head starts on the leftmost tape symbol, or the leftmost blank for an empty tape.
 - Moving left at the tape boundary leaves the head in place.
-- `#` delimits data values and `blank`, displayed as `⊔`, represents an unused cell.
+- `blank`, displayed as `⊔`, represents an unused cell.
 - Accept and reject states are distinct and halt immediately.
-- The transition function is defined for every nonhalting state and all four tape symbols.
+- A missing transition is reported when execution encounters that state and symbol.
 - Transitions use only `L` and `R`; Sipser's core model has no stay-put move.
 
-The data alphabet is implicit and cannot be changed:
+Symbols are Unicode scalar characters. Rust stores each symbol as a four-byte `char`, and the WASM API serializes symbols as JavaScript strings. The input and tape alphabets reported by the runtime are inferred from the characters used in transitions; blank is always included in the tape alphabet.
 
-```text
-input = { 0, 1, # }
-tape = { 0, 1, #, blank }
-```
+Quoted symbols use JSON string escaping and must contain exactly one character. This supports arbitrary letters, punctuation, whitespace, and escaped control characters, for example `"λ"`, `","`, `" "`, and `"\n"`. Use the keyword `blank` for the blank symbol.
 
 Imports, endpoint inclusion, functions, and Markdown documentation are Studio extensions around that machine model.
 
@@ -79,7 +76,7 @@ Each `.tm` file contains exactly one program or function. Imports name functions
 ```tm
 model sipser-3e;
 
-/// Negates a 32-bit MSB-first word twice.
+/// Negates a binary word twice.
 program DoubleNot;
 
 import "lib/logic/not.tm" as first;
@@ -130,7 +127,7 @@ Lines beginning with `///` attach Markdown documentation to the following `progr
 
 ```tm
 /// ## Contract
-/// Reads two 32-bit words beginning at the head.
+/// Reads two binary words beginning at the head.
 ///
 /// Writes the result into the next word and moves the head there.
 function And32;
@@ -140,25 +137,23 @@ Machine and current-state documentation opens in a sanitized Markdown dialog. Us
 
 ## Tape editing
 
-The visual tape is the input editor. Click a cell to cycle through blank, `0`, `1`, and `#`; focus a cell and type a symbol to set it directly. Delete, Backspace, or Space writes blank. Pasting writes a raw sequence of `0`, `1`, `#`, and `⊔` beginning at the focused cell. Shift-click places the initial head for function contracts that begin away from cell zero. Editing stops and resets execution, and the edited tape and head become the baseline used by Reset.
+The visual tape is the input editor. Click a cell to cycle through blank and the symbols known from the current transition table; focus a cell and type any character to set it directly. Delete or Backspace writes blank. Pasting writes arbitrary characters beginning at the focused cell, including whitespace. Shift-click places the initial head for function contracts that begin away from cell zero. Editing stops and resets execution, and the edited tape and head become the baseline used by Reset.
 
-Use Previous cells and Next cells to navigate the right-infinite tape. Editing is disabled while the machine runs.
+The viewport follows the head automatically and renders only 17 cells, centered on the head except near the tape's left endpoint. Editing is disabled while the machine runs.
 
 ## Registry word ABI
 
-Standard registry functions operate on fixed 32-bit words ordered most-significant bit first. Every word has a trailing delimiter, producing layouts such as `word#word#`.
+Some registry functions define their own fixed-width binary contracts. Those contracts belong to the individual programs and do not constrain the runtime's symbol alphabet.
 
 Unary transforming operations such as NOT and increment update the word under the head and return to its most-significant bit. Binary operations read two adjacent words, preserve the first, write the result into the second, and finish on the second word's most-significant bit. This allows subsequent binary operations to consume the result and the following word without moving existing tape data. Predicates and navigation primitives define their head movement in their individual contracts.
 
 The `lib/primitives/` category provides functions for moving to adjacent words, clearing a word, and validating word width.
 
-## Execution and output
+## Execution
 
 `Run` animates execution at the selected speed and stops at declared pauses. `Run to completion` bypasses pauses and executes immediately with a one-million-transition safety limit. For a standalone machine, Step performs one transition. For a composition, Step executes the current function through its accepting or rejecting state.
 
-The value inspector at the top of the tape is both the live value and final output. It supports raw symbols, UTF-8 characters, binary, decimal, and hexadecimal formats. Numeric and character formats convert every `#`-delimited word independently, so delimiters and leading hexadecimal zeroes remain visible. UTF-8 requires complete valid bytes. Trailing blanks are omitted; use Symbols to inspect internal blanks.
-
-The visual tape shows a navigable 16-cell window that follows the head during execution. This is only a viewport over the right-infinite tape.
+The visual tape shows a bounded 17-cell window that follows the head during execution. This is only a viewport over the right-infinite tape; it never creates DOM elements for the full tape.
 
 ## References
 

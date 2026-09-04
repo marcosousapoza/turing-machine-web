@@ -2,7 +2,6 @@
   import { onMount } from 'svelte'
   import { ModeWatcher } from 'mode-watcher'
   import BookOpen from '@lucide/svelte/icons/book-open'
-  import ChevronLeft from '@lucide/svelte/icons/chevron-left'
   import ChevronRight from '@lucide/svelte/icons/chevron-right'
   import CircleStop from '@lucide/svelte/icons/circle-stop'
   import Download from '@lucide/svelte/icons/download'
@@ -23,7 +22,7 @@
   import ThemeToggle from './lib/ThemeToggle.svelte'
   import { CompositeMachine, isComposition, type Definition, type Snapshot } from './lib/composition'
   import { createModuleResolver, fetchProgram, libraryPath } from './lib/imports'
-  import { formatTape, pasteTape, replaceTape, type TapeFormat } from './lib/tape'
+  import { pasteTape, replaceTape } from './lib/tape'
 
   type Runtime = {
     step(): string | Promise<string>
@@ -52,7 +51,7 @@
   const CATALOG_URL = 'https://raw.githubusercontent.com/marcosousapoza/turing-machine-programs/main/catalog.json'
   const starter = `model sipser-3e;
 
-/// Negates one 32-bit MSB-first word twice.
+/// Negates a binary word twice.
 program DoubleNot;
 
 import "lib/logic/not.tm" as first;
@@ -72,9 +71,8 @@ reject q_reject;`
   let source = starter
   let mainSource = starter
   let activeFile = 'main.tm'
-  let tape = '00000000000000000000000000000001#'
+  let tape = '01#'
   let tapeHead = 0
-  let tapeFormat: TapeFormat = 'binary'
   let machine: Runtime | null = null
   let snapshot: Snapshot | null = null
   let definition: Definition | null = null
@@ -93,13 +91,11 @@ reject q_reject;`
   let timer: ReturnType<typeof setInterval> | undefined
   let fileInput: HTMLInputElement
   let folderInput: HTMLInputElement
-  let viewportStart = 0
   let docsTitle = ''
   let docsHtml = ''
 
   $: currentStateDocs = definition?.states.find((state) => state.name === snapshot?.state)?.docs
-  $: currentTape = snapshot ? formatTape(snapshot.tape, tapeFormat, definition?.blank) : '—'
-  $: visibleTape = tapeWindow(snapshot, definition?.blank ?? '⊔', viewportStart)
+  $: visibleTape = tapeWindow(snapshot, definition?.blank ?? '⊔')
   $: categories = [...new Set(catalog.map((program) => program.category))]
 
   onMount(() => {
@@ -144,8 +140,9 @@ reject q_reject;`
     return JSON.parse(value) as Snapshot
   }
 
-  function tapeWindow(current: Snapshot | null, blank: string, start: number): { index: number; symbol: string }[] {
-    return Array.from({ length: 16 }, (_, offset) => {
+  function tapeWindow(current: Snapshot | null, blank: string): { index: number; symbol: string }[] {
+    const start = Math.max(0, (current?.head ?? 0) - 8)
+    return Array.from({ length: 17 }, (_, offset) => {
       const index = start + offset
       return { index, symbol: current?.tape[index] ?? blank }
     })
@@ -182,8 +179,6 @@ reject q_reject;`
         machine = nextMachine
         snapshot = readSnapshot(machine.snapshot())
         definition = JSON.parse(machine.definition()) as Definition
-        viewportStart = 0
-        followHead()
       } catch (value) {
         if (generation !== compileGeneration) return
         if (nextMachine && machine !== nextMachine) nextMachine.free()
@@ -205,7 +200,6 @@ reject q_reject;`
       try {
         if (!machine || snapshot?.halted) return
         snapshot = readSnapshot(await machine.step())
-        followHead()
         if (snapshot.halted || snapshot.paused) stop()
       } catch (value) {
         error = message(value)
@@ -247,7 +241,6 @@ reject q_reject;`
       try {
         if (!machine) return
         snapshot = readSnapshot(await machine.run(1_000_000))
-        followHead()
         if (!snapshot.halted && !snapshot.paused) error = 'Execution stopped after the 1,000,000-step safety limit.'
       } catch (value) {
         error = message(value)
@@ -353,18 +346,11 @@ reject q_reject;`
     await compile()
   }
 
-  function followHead(): void {
-    if (!snapshot) return
-    if (snapshot.head < viewportStart) viewportStart = snapshot.head
-    else if (snapshot.head >= viewportStart + 16) viewportStart = snapshot.head - 15
-  }
-
   async function setRuntimeTape(value: string): Promise<void> {
     if (!machine) return compile()
     const result = machine.setTape ? await machine.setTape(value) : machine.set_tape?.(value)
     if (!result) throw new Error('The loaded runtime does not support tape editing.')
     snapshot = readSnapshot(result)
-    viewportStart = 0
   }
 
   async function applyTape(value: string): Promise<void> {
@@ -383,7 +369,6 @@ reject q_reject;`
         paused: false,
         steps: 0,
       }
-      viewportStart = 0
     }
     if (!machine) {
       await compile()
@@ -405,8 +390,8 @@ reject q_reject;`
   function cycleTapeCell(index: number): void {
     if (running) return
     const blank = definition?.blank ?? '⊔'
-    const symbols = [blank, '0', '1', '#']
     const current = snapshot?.tape[index] ?? blank
+    const symbols = [...new Set([blank, ...(definition?.tape_alphabet ?? []), current])]
     void applyTape(replaceTape(snapshot?.tape ?? [], index, symbols[(symbols.indexOf(current) + 1) % symbols.length], blank))
   }
 
@@ -414,8 +399,8 @@ reject q_reject;`
     if (running) return
     const blank = definition?.blank ?? '⊔'
     let symbol = event.key
-    if (event.key === 'Backspace' || event.key === 'Delete' || event.key === ' ') symbol = blank
-    if (!['0', '1', '#', blank].includes(symbol)) return
+    if (event.key === 'Backspace' || event.key === 'Delete') symbol = blank
+    if ([...symbol].length !== 1) return
     event.preventDefault()
     void applyTape(replaceTape(snapshot?.tape ?? [], index, symbol, blank))
   }
@@ -556,7 +541,7 @@ reject q_reject;`
           <div class="flex items-center gap-3">
             <div>
               <h2 class="text-sm font-semibold">Tape</h2>
-              <p class="text-xs text-muted-foreground">Click to cycle · type or paste <span class="font-mono">0 1 # ⊔</span> · Shift-click to move head</p>
+              <p class="text-xs text-muted-foreground">Type or paste any character · click to cycle known symbols · Shift-click to move head</p>
             </div>
             {#if snapshot}
               <span class:accepted={snapshot.accepted} class:rejected={snapshot.rejected} class="status-pill">{snapshot.accepted ? 'Accepted' : snapshot.rejected ? 'Rejected' : snapshot.paused ? 'Paused' : running ? 'Running' : 'Ready'}</span>
@@ -568,11 +553,6 @@ reject q_reject;`
           </div>
         </div>
 
-        <div class="grid gap-3 border-b border-border bg-muted/30 p-3 sm:grid-cols-[150px_minmax(0,1fr)] sm:items-center">
-          <select class="compact-select" bind:value={tapeFormat} aria-label="Tape representation"><option value="symbols">Symbols</option><option value="string">Characters (UTF-8)</option><option value="binary">Binary</option><option value="decimal">Decimal</option><option value="hex">Hexadecimal</option></select>
-          <output class="min-w-0 overflow-x-auto whitespace-nowrap rounded-md bg-background px-3 py-2 font-mono text-xs">{currentTape}</output>
-        </div>
-
         <div class="tape-scroll">
           <div class="flex min-w-max gap-1 p-6 sm:p-8">
             {#each visibleTape as cell}
@@ -582,12 +562,10 @@ reject q_reject;`
         </div>
 
         <div class="flex flex-wrap items-center gap-2 border-t border-border p-3">
-          <button class="secondary-button" onclick={() => viewportStart = Math.max(0, viewportStart - 16)} disabled={viewportStart === 0}><ChevronLeft class="size-4" /> Previous cells</button>
-          <button class="secondary-button" onclick={() => viewportStart += 16}>Next cells <ChevronRight class="size-4" /></button>
+          <button class="secondary-button" onclick={step} disabled={!machine || snapshot?.halted || advancing}><StepForward class="size-4" /> Step</button>
           <button class="primary-button" onclick={toggleRun} disabled={!machine}>{#if running}<Pause class="size-4" /> Pause{:else}<Play class="size-4" /> Run{/if}</button>
           <button class="secondary-button" onclick={runToCompletion} disabled={!machine}><FastForward class="size-4" /> Run to completion</button>
-          <button class="secondary-button" onclick={step} disabled={!machine || snapshot?.halted || advancing}><StepForward class="size-4" /> Step</button>
-          <button class="secondary-button" onclick={resetTape} disabled={!machine}><RotateCcw class="size-4" /> Reset tape</button>
+          <button class="secondary-button" onclick={resetTape} disabled={!machine}><RotateCcw class="size-4" /> Reset</button>
           <label class="ml-auto flex items-center gap-2 text-xs text-muted-foreground">Speed <input class="w-24 accent-primary" type="range" min="50" max="1000" step="50" bind:value={speed} onchange={applySpeed} /></label>
         </div>
       </section>

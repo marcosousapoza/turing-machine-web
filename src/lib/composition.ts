@@ -87,15 +87,16 @@ export class CompositeMachine {
   definition(): string {
     const states = new Set([this.plan.start, this.plan.accept, this.plan.reject, ...this.plan.pauses])
     for (const state of this.plan.includes.values()) states.add(state)
+    const concrete = JSON.parse(this.machine.definition()) as Definition
     const definition: Definition = {
       model: 'sipser-3e',
       kind: 'program',
       name: this.plan.name,
       docs: this.plan.docs,
       imports: this.plan.imports.map((item) => item.path),
-      input_alphabet: ['0', '1', '#'],
-      tape_alphabet: ['0', '1', '#', '⊔'],
-      blank: '⊔',
+      input_alphabet: concrete.input_alphabet,
+      tape_alphabet: concrete.tape_alphabet,
+      blank: concrete.blank,
       start: this.plan.start,
       accept: this.plan.accept,
       reject: this.plan.reject,
@@ -339,7 +340,7 @@ export function buildConcreteBlock(plan: CompositionPlan, block: ImportDeclarati
     return `${block.namespace}${state}`
   }
   const body: string[] = []
-  const transition = new RegExp(`^(\\s*)(${IDENTIFIER})(\\s*,\\s*(?:"[^"]*"|blank)\\s*->\\s*)(${IDENTIFIER})(\\s*,.*)$`)
+  const transition = new RegExp(`^(\\s*)(${IDENTIFIER})(\\s*,\\s*(?:"(?:\\\\.|[^"\\\\])*"|blank)\\s*->\\s*)(${IDENTIFIER})(\\s*,.*)$`)
   const stateDeclaration = new RegExp(`^state (${IDENTIFIER})$`)
   for (const original of source.split(/\r?\n/)) {
     const line = original.trim().split('//')[0].trim().replace(/;$/, '').trim()
