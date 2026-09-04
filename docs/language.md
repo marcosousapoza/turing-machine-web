@@ -5,18 +5,18 @@
 Execution follows Michael Sipser's deterministic, single-tape Turing machine from *Introduction to the Theory of Computation*, 3rd edition, Section 3.1.
 
 - The tape has a left endpoint and is infinite to the right.
-- The head starts on the leftmost input bit, or the leftmost blank for empty input.
+- The head starts on the leftmost tape symbol, or the leftmost blank for an empty tape.
 - Moving left at the tape boundary leaves the head in place.
-- `blank`, displayed as `⊔`, is the only nonbinary tape symbol.
+- `#` delimits data values and `blank`, displayed as `⊔`, represents an unused cell.
 - Accept and reject states are distinct and halt immediately.
-- The transition function is defined for every nonhalting state and all three tape symbols.
+- The transition function is defined for every nonhalting state and all four tape symbols.
 - Transitions use only `L` and `R`; Sipser's core model has no stay-put move.
 
-The binary data alphabet is implicit and cannot be changed:
+The data alphabet is implicit and cannot be changed:
 
 ```text
-input = output = { 0, 1 }
-tape = { 0, 1, blank }
+input = { 0, 1, # }
+tape = { 0, 1, #, blank }
 ```
 
 Imports, endpoint inclusion, functions, and Markdown documentation are Studio extensions around that machine model.
@@ -40,6 +40,7 @@ state q0;
 
 q0, "0" -> q0, "0", R;
 q0, "1" -> q_accept, "1", R;
+q0, "#" -> q_reject, "#", R;
 q0, blank -> q_reject, blank, R;
 ```
 
@@ -65,6 +66,7 @@ reject q_reject;
 
 q0, "0" -> q_accept, "0", R;
 q0, "1" -> q_accept, "1", R;
+q0, "#" -> q_accept, "#", R;
 q0, blank -> q_accept, blank, R;
 ```
 
@@ -80,8 +82,8 @@ model sipser-3e;
 /// Negates a 32-bit MSB-first word twice.
 program DoubleNot;
 
-import "logic/not.tm" as first;
-import "logic/not.tm" as second;
+import "lib/logic/not.tm" as first;
+import "lib/logic/not.tm" as second;
 
 include first.start as q0;
 include first.accept as q1;
@@ -98,7 +100,7 @@ reject q_reject;
 The loader performs these steps:
 
 1. Parse the composite declarations without fetching imported files.
-2. Resolve a function from uploaded local files or the public registry only when execution reaches its included start state.
+2. Resolve a function by exact path from an opened local library folder or the public registry only when execution reaches its included start state.
 3. Assign the import instance a generated namespace and parse it as one concrete machine.
 4. Rename internal states, such as `__tm_0_first__q_return`, so lazily loaded functions cannot collide.
 5. Replace the previous transition table while retaining the tape, head position, and cumulative step count.
@@ -113,14 +115,14 @@ The composite program declares its public `start`, `accept`, and `reject` states
 Registry paths encode categories:
 
 ```text
-programs/
+lib/
   logic/
   math/
   predicates/
   primitives/
 ```
 
-The catalog exposes each path, category, unit kind, example input, and description. The Studio explorer groups entries by category. Opening an entry edits it directly; the plus button creates a program that imports and includes a function.
+The catalog exposes each path, category, unit kind, example tape, and description. The Studio explorer groups entries by category. Opening an entry edits it directly; the plus button creates a program that imports and includes a function.
 
 ## Documentation
 
@@ -136,34 +138,27 @@ function And32;
 
 Machine and current-state documentation opens in a sanitized Markdown dialog. Use `//` for comments that should not become documentation.
 
-## Tape input
+## Tape editing
 
-The input control accepts an explicit encoding or auto-detects `0b` and `0x` prefixes:
+The visual tape is the input editor. Click a cell to cycle through blank, `0`, `1`, and `#`; focus a cell and type a symbol to set it directly. Delete, Backspace, or Space writes blank. Pasting writes a raw sequence of `0`, `1`, `#`, and `⊔` beginning at the focused cell. Shift-click places the initial head for function contracts that begin away from cell zero. Editing stops and resets execution, and the edited tape and head become the baseline used by Reset.
 
-| Input | Binary tape |
-| --- | --- |
-| `hello` as UTF-8 | `0110100001100101011011000110110001101111` |
-| `0b1010` | `1010` |
-| `0x2a` | `00101010` |
-| `42` as Decimal | `101010` |
-
-All encodings produce only binary tape data. Hexadecimal input preserves four bits per digit, including leading zeroes.
+Use Previous cells and Next cells to navigate the right-infinite tape. Editing is disabled while the machine runs.
 
 ## Registry word ABI
 
-Standard registry functions operate on fixed 32-bit words ordered most-significant bit first. Hexadecimal input is the most concise way to preserve word width: `0x00000001` produces exactly one word.
+Standard registry functions operate on fixed 32-bit words ordered most-significant bit first. Every word has a trailing delimiter, producing layouts such as `word#word#`.
 
 Unary transforming operations such as NOT and increment update the word under the head and return to its most-significant bit. Binary operations read two adjacent words, preserve the first, write the result into the second, and finish on the second word's most-significant bit. This allows subsequent binary operations to consume the result and the following word without moving existing tape data. Predicates and navigation primitives define their head movement in their individual contracts.
 
-The `primitives/` category provides functions for moving to adjacent words, clearing a word, and validating word width.
+The `lib/primitives/` category provides functions for moving to adjacent words, clearing a word, and validating word width.
 
 ## Execution and output
 
 `Run` animates execution at the selected speed and stops at declared pauses. `Run to completion` bypasses pauses and executes immediately with a one-million-transition safety limit. For a standalone machine, Step performs one transition. For a composition, Step executes the current function through its accepting or rejecting state.
 
-The single Tape value inspector is both the live value and final output. It supports UTF-8, binary, decimal, and hexadecimal formats. UTF-8 requires complete valid bytes. Blank cells at the end are omitted, and a tape without binary content is displayed as `Empty`.
+The value inspector at the top of the tape is both the live value and final output. It supports raw symbols, UTF-8 characters, binary, decimal, and hexadecimal formats. Numeric and character formats convert every `#`-delimited word independently, so delimiters and leading hexadecimal zeroes remain visible. UTF-8 requires complete valid bytes. Trailing blanks are omitted; use Symbols to inspect internal blanks.
 
-The visual tape always shows a 16-cell window that follows the head. This is only a viewport over the right-infinite tape.
+The visual tape shows a navigable 16-cell window that follows the head during execution. This is only a viewport over the right-infinite tape.
 
 ## References
 

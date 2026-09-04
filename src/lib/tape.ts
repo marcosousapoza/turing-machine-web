@@ -1,32 +1,4 @@
-export type TapeEncoding = 'auto' | 'text' | 'binary' | 'hex' | 'decimal'
-export type TapeFormat = 'string' | 'binary' | 'hex' | 'decimal'
-
-export function decodeTape(value: string, encoding: TapeEncoding): string {
-  const selected = encoding === 'auto'
-    ? value.trim().toLowerCase().startsWith('0x') ? 'hex'
-      : value.trim().toLowerCase().startsWith('0b') ? 'binary'
-        : 'text'
-    : encoding
-
-  if (selected === 'text') {
-    return [...new TextEncoder().encode(value)]
-      .map((byte) => byte.toString(2).padStart(8, '0'))
-      .join('')
-  }
-  const compact = value.replaceAll(/\s|_/g, '')
-  if (selected === 'binary') {
-    const binary = compact.replace(/^0b/i, '')
-    if (!binary || /[^01]/.test(binary)) throw new Error('Binary input may only contain 0 and 1.')
-    return binary
-  }
-  if (selected === 'hex') {
-    const hex = compact.replace(/^0x/i, '')
-    if (!hex || /[^0-9a-f]/i.test(hex)) throw new Error('Hex input must contain hexadecimal digits.')
-    return [...hex].map((digit) => Number.parseInt(digit, 16).toString(2).padStart(4, '0')).join('')
-  }
-  if (!compact || /\D/.test(compact)) throw new Error('Decimal input must be a non-negative integer.')
-  return BigInt(compact).toString(2)
-}
+export type TapeFormat = 'symbols' | 'string' | 'binary' | 'hex' | 'decimal'
 
 export function tapeContent(tape: string[], blank = '⊔'): string {
   return tape.join('').replace(new RegExp(`${escapeRegex(blank)}+$`), '')
@@ -35,20 +7,47 @@ export function tapeContent(tape: string[], blank = '⊔'): string {
 export function formatTape(tape: string[], format: TapeFormat, blank = '⊔'): string {
   const content = tapeContent(tape, blank)
   if (!content) return 'Empty'
-  if (/[^01]/.test(content)) return format === 'string' ? 'Not UTF-8 encoded' : 'Not a binary tape'
+  if (format === 'symbols') return content
+  if (content.includes(blank)) return 'Contains internal blanks'
+
+  return content.split('#').map((word) => formatWord(word, format)).join('#')
+}
+
+export function replaceTape(tape: string[], index: number, value: string, blank = '⊔'): string {
+  const next = [...tape]
+  while (next.length <= index) next.push(blank)
+  next[index] = value
+  while (next.at(-1) === blank) next.pop()
+  return next.join('')
+}
+
+export function pasteTape(tape: string[], index: number, value: string, blank = '⊔'): string {
+  const symbols = [...value.replaceAll(/\s/g, '')]
+  const invalid = symbols.find((symbol) => !['0', '1', '#', blank].includes(symbol))
+  if (invalid) throw new Error(`Tape symbol \`${invalid}\` is invalid. Use 0, 1, #, or ${blank}.`)
+  const next = [...tape]
+  while (next.length < index) next.push(blank)
+  next.splice(index, symbols.length, ...symbols)
+  while (next.at(-1) === blank) next.pop()
+  return next.join('')
+}
+
+function formatWord(word: string, format: Exclude<TapeFormat, 'symbols'>): string {
+  if (!word) return ''
+  if (/[^01]/.test(word)) return 'Not a binary word'
   if (format === 'string') {
-    if (content.length % 8 !== 0) return `Incomplete UTF-8 byte (${content.length} bits)`
-    const bytes = Uint8Array.from(content.match(/.{8}/g) ?? [], (byte) => Number.parseInt(byte, 2))
+    if (word.length % 8 !== 0) return `Incomplete UTF-8 byte (${word.length} bits)`
+    const bytes = Uint8Array.from(word.match(/.{8}/g) ?? [], (byte) => Number.parseInt(byte, 2))
     try {
       return new TextDecoder('utf-8', { fatal: true }).decode(bytes) || 'Empty'
     } catch {
       return 'Invalid UTF-8 sequence'
     }
   }
-  if (format === 'binary') return `0b${content}`
-  const value = BigInt(`0b${content}`)
+  if (format === 'binary') return `0b${word}`
+  const value = BigInt(`0b${word}`)
   if (format === 'decimal') return value.toString(10)
-  return `0x${value.toString(16).padStart(Math.ceil(content.length / 4), '0')}`
+  return `0x${value.toString(16).padStart(Math.ceil(word.length / 4), '0')}`
 }
 
 function escapeRegex(value: string): string {

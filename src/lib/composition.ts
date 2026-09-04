@@ -18,6 +18,8 @@ export type Definition = {
   name: string
   docs?: string
   imports?: string[]
+  input_alphabet: string[]
+  tape_alphabet: string[]
   blank: string
   start: string
   accept: string
@@ -40,7 +42,7 @@ type CompositionPlan = {
   reject: string
 }
 
-type LoadableMachine = Machine & { load(source: string): string }
+type LoadableMachine = Machine & { load(source: string): string; set_head(head: number): string; set_tape(tape: string): string }
 
 const IDENTIFIER = '[a-zA-Z_][a-zA-Z0-9_]*'
 const BLOCK_STEP_LIMIT = 1_000_000
@@ -58,6 +60,7 @@ export class CompositeMachine {
   private constructor(
     private readonly plan: CompositionPlan,
     private readonly resolveModule: ModuleResolver,
+    private readonly firstConcrete: string,
     machine: LoadableMachine,
     initial: Snapshot,
   ) {
@@ -72,7 +75,7 @@ export class CompositeMachine {
     const concrete = buildConcreteBlock(plan, first, await resolveModule(first.path))
     const machine = new Machine(concrete, tape) as LoadableMachine
     const initial = withBlock(readSnapshot(machine.snapshot()), first.alias)
-    const composite = new CompositeMachine(plan, resolveModule, machine, initial)
+    const composite = new CompositeMachine(plan, resolveModule, concrete, machine, initial)
     composite.active = first
     return composite
   }
@@ -90,6 +93,8 @@ export class CompositeMachine {
       name: this.plan.name,
       docs: this.plan.docs,
       imports: this.plan.imports.map((item) => item.path),
+      input_alphabet: ['0', '1', '#'],
+      tape_alphabet: ['0', '1', '#', '⊔'],
       blank: '⊔',
       start: this.plan.start,
       accept: this.plan.accept,
@@ -126,6 +131,26 @@ export class CompositeMachine {
       this.finishBlock(result)
       if (this.current.paused) this.current = { ...this.current, paused: false }
     }
+    return this.snapshot()
+  }
+
+  async setTape(tape: string): Promise<string> {
+    const first = this.plan.blocks.get(this.plan.start)
+    if (!first) throw new Error(`No function starts at program state \`${this.plan.start}\`.`)
+    this.machine.load(this.firstConcrete)
+    this.current = withBlock(readSnapshot(this.machine.set_tape(tape)), first.alias)
+    this.active = first
+    this.boundary = false
+    return this.snapshot()
+  }
+
+  setHead(head: number): string {
+    const first = this.plan.blocks.get(this.plan.start)
+    if (!first) throw new Error(`No function starts at program state \`${this.plan.start}\`.`)
+    this.machine.load(this.firstConcrete)
+    this.current = withBlock(readSnapshot(this.machine.set_head(head)), first.alias)
+    this.active = first
+    this.boundary = false
     return this.snapshot()
   }
 

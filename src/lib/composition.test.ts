@@ -23,9 +23,11 @@ reject q_reject;
 state q_work;
 q0, "0" -> q_work, "0", R;
 q0, "1" -> q_work, "1", R;
+q0, "#" -> q_reject, "#", R;
 q0, blank -> q_reject, blank, R;
 q_work, "0" -> q_reject, "0", R;
 q_work, "1" -> q_reject, "1", R;
+q_work, "#" -> q_accept, "#", L;
 q_work, blank -> q_accept, blank, L;`
 
 describe('composition compiler', () => {
