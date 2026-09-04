@@ -22,7 +22,7 @@
   import ThemeToggle from './lib/ThemeToggle.svelte'
   import { CompositeMachine, isComposition, type Definition, type Snapshot } from './lib/composition'
   import { createModuleResolver, fetchProgram, libraryPath } from './lib/imports'
-  import { pasteTape, replaceTape } from './lib/tape'
+  import { parseTapeNotation } from './lib/tape'
 
   type Runtime = {
     step(): string | Promise<string>
@@ -51,16 +51,16 @@
   const CATALOG_URL = 'https://raw.githubusercontent.com/marcosousapoza/turing-machine-programs/main/catalog.json'
   const starter = `model sipser-3e;
 
-/// Negates a binary word twice.
-program DoubleNot;
+/// Moves to the next word, pauses, then returns to the first word.
+program RoundTrip;
 
-import "lib/logic/not.tm" as first;
-import "lib/logic/not.tm" as second;
+import "lib/primitives/next-word.tm" as next;
+import "lib/primitives/previous-word.tm" as previous;
 
-include first.start as q0;
-include first.accept as q1;
-include second.start as q1;
-include second.accept as q_accept;
+include next.start as q0;
+include next.accept as q1;
+include previous.start as q1;
+include previous.accept as q_accept;
 
 pause q1;
 
@@ -71,8 +71,10 @@ reject q_reject;`
   let source = starter
   let mainSource = starter
   let activeFile = 'main.tm'
-  let tape = '01#'
+  let tapeNotation = 'b01#xF#'
+  let tape = parseTapeNotation(tapeNotation)
   let tapeHead = 0
+  let tapeHeadInput = 0
   let machine: Runtime | null = null
   let snapshot: Snapshot | null = null
   let definition: Definition | null = null
@@ -121,7 +123,7 @@ reject q_reject;`
     const response = await fetch(CATALOG_URL)
     if (!response.ok) throw new Error(`Could not load program catalog (${response.status}).`)
     const next = (await response.json()) as Catalog
-    if (next.version !== 4) throw new Error(`Program catalog version ${next.version} is incompatible; expected version 4.`)
+    if (next.version !== 5) throw new Error(`Program catalog version ${next.version} is incompatible; expected version 5.`)
     catalog = next.programs
   }
 
@@ -325,8 +327,10 @@ reject q_reject;`
       persistActive()
       source = nextSource
       activeFile = program.path
-      tape = program.tape
+      tapeNotation = program.tape
+      tape = parseTapeNotation(tapeNotation)
       tapeHead = program.head ?? 0
+      tapeHeadInput = tapeHead
       await compile()
     } catch (value) {
       error = message(value)
@@ -341,8 +345,10 @@ reject q_reject;`
     source = `model sipser-3e;\n\n/// Runs the imported ${program.name} function.\nprogram Main;\n\nimport "${program.path}" as ${alias};\ninclude ${alias}.start as q0;\ninclude ${alias}.accept as q_accept;\n\nstart q0;\naccept q_accept;\nreject q_reject;`
     mainSource = source
     activeFile = 'main.tm'
-    tape = program.tape
+    tapeNotation = program.tape
+    tape = parseTapeNotation(tapeNotation)
     tapeHead = program.head ?? 0
+    tapeHeadInput = tapeHead
     await compile()
   }
 
@@ -353,16 +359,27 @@ reject q_reject;`
     snapshot = readSnapshot(result)
   }
 
-  async function applyTape(value: string): Promise<void> {
+  async function applyTape(): Promise<void> {
     stop()
     error = ''
-    tape = value
+    let nextTape: string
+    try {
+      nextTape = parseTapeNotation(tapeNotation)
+      if (!Number.isSafeInteger(tapeHeadInput) || tapeHeadInput < 0) {
+        throw new Error('Head position must be a nonnegative integer.')
+      }
+    } catch (value) {
+      error = message(value)
+      return
+    }
+    tape = nextTape
+    tapeHead = tapeHeadInput
     if (snapshot && definition) {
       snapshot = {
         ...snapshot,
         state: definition.start,
         head: tapeHead,
-        tape: [...(value || definition.blank)],
+        tape: [...(tape || definition.blank)],
         halted: false,
         accepted: false,
         rejected: false,
@@ -376,7 +393,9 @@ reject q_reject;`
     }
     await serializeRuntime(async () => {
       try {
-        await setRuntimeTape(value)
+        await setRuntimeTape(tape)
+        const result = machine?.setHead ? machine.setHead(tapeHead) : machine?.set_head?.(tapeHead)
+        if (result) snapshot = readSnapshot(result)
       } catch (value) {
         error = message(value)
       }
@@ -384,44 +403,16 @@ reject q_reject;`
   }
 
   async function resetTape(): Promise<void> {
-    await applyTape(tape)
-  }
-
-  function cycleTapeCell(index: number): void {
-    if (running) return
-    const blank = definition?.blank ?? '⊔'
-    const current = snapshot?.tape[index] ?? blank
-    const symbols = [...new Set([blank, ...(definition?.tape_alphabet ?? []), current])]
-    void applyTape(replaceTape(snapshot?.tape ?? [], index, symbols[(symbols.indexOf(current) + 1) % symbols.length], blank))
-  }
-
-  function editTapeCell(event: KeyboardEvent, index: number): void {
-    if (running) return
-    const blank = definition?.blank ?? '⊔'
-    let symbol = event.key
-    if (event.key === 'Backspace' || event.key === 'Delete') symbol = blank
-    if ([...symbol].length !== 1) return
-    event.preventDefault()
-    void applyTape(replaceTape(snapshot?.tape ?? [], index, symbol, blank))
-  }
-
-  function pasteIntoTape(event: ClipboardEvent, index: number): void {
-    if (running) return
-    event.preventDefault()
-    try {
-      void applyTape(pasteTape(snapshot?.tape ?? [], index, event.clipboardData?.getData('text') ?? '', definition?.blank ?? '⊔'))
-    } catch (value) {
-      error = message(value)
-    }
-  }
-
-  async function setTapeHead(index: number): Promise<void> {
-    if (!machine || running) return
     stop()
-    tapeHead = index
+    error = ''
     await serializeRuntime(async () => {
-      const result = machine?.setHead ? machine.setHead(index) : machine?.set_head?.(index)
-      if (result) snapshot = readSnapshot(result)
+      try {
+        await setRuntimeTape(tape)
+        const result = machine?.setHead ? machine.setHead(tapeHead) : machine?.set_head?.(tapeHead)
+        if (result) snapshot = readSnapshot(result)
+      } catch (value) {
+        error = message(value)
+      }
     })
   }
 </script>
@@ -541,7 +532,7 @@ reject q_reject;`
           <div class="flex items-center gap-3">
             <div>
               <h2 class="text-sm font-semibold">Tape</h2>
-              <p class="text-xs text-muted-foreground">Type or paste any character · click to cycle known symbols · Shift-click to move head</p>
+              <p class="text-xs text-muted-foreground">Binary and hexadecimal words separated by <span class="font-mono">#</span></p>
             </div>
             {#if snapshot}
               <span class:accepted={snapshot.accepted} class:rejected={snapshot.rejected} class="status-pill">{snapshot.accepted ? 'Accepted' : snapshot.rejected ? 'Rejected' : snapshot.paused ? 'Paused' : running ? 'Running' : 'Ready'}</span>
@@ -553,10 +544,20 @@ reject q_reject;`
           </div>
         </div>
 
+        <form class="grid gap-3 border-b border-border bg-muted/30 p-3 sm:grid-cols-[minmax(0,1fr)_8rem_auto] sm:items-end" onsubmit={(event) => { event.preventDefault(); void applyTape() }}>
+          <label class="field-label">Tape notation
+            <input class="font-mono" bind:value={tapeNotation} placeholder="xFFFF#b0011#" spellcheck="false" disabled={running} />
+          </label>
+          <label class="field-label">Head cell
+            <input type="number" min="0" step="1" bind:value={tapeHeadInput} disabled={running} />
+          </label>
+          <button class="primary-button h-10" type="submit" disabled={running}>Apply tape</button>
+        </form>
+
         <div class="tape-scroll">
           <div class="flex min-w-max gap-1 p-6 sm:p-8">
             {#each visibleTape as cell}
-              <button class:head-cell={cell.index === snapshot?.head} class:blank-cell={cell.symbol === (definition?.blank ?? '⊔')} class="tape-cell" disabled={running} onclick={(event) => event.shiftKey ? void setTapeHead(cell.index) : cycleTapeCell(cell.index)} onkeydown={(event) => editTapeCell(event, cell.index)} onpaste={(event) => pasteIntoTape(event, cell.index)} aria-label={`Tape cell ${cell.index}: ${cell.symbol}`}><span>{cell.index}</span><strong>{cell.symbol}</strong></button>
+              <div class:head-cell={cell.index === snapshot?.head} class:blank-cell={cell.symbol === (definition?.blank ?? '⊔')} class="tape-cell" aria-label={`Tape cell ${cell.index}: ${cell.symbol}`}><span>{cell.index}</span><strong>{cell.symbol}</strong></div>
             {/each}
           </div>
         </div>

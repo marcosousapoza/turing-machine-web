@@ -9,7 +9,7 @@ The core machine model and notation follow Michael Sipser's *Introduction to the
 - Arbitrary Unicode character symbols with alphabets inferred from transitions
 - One-way-infinite tape with explicit accept and reject states
 - Transition-level stepping for standalone machines and function-level stepping for compositions
-- Direct character editing and paste on the tape
+- Binary and hexadecimal word input such as `xFFFF#b0011#`
 - A bounded 17-cell tape viewport centered on the head
 - Path-preserving local library folders and a remote community program explorer
 - Lazily fetched, automatically namespaced function imports
@@ -18,6 +18,8 @@ The core machine model and notation follow Michael Sipser's *Introduction to the
 - Sanitized Markdown documentation dialogs from `///` comments
 - Animated execution and immediate run-to-completion
 - Light and dark themes matching the shadcn-svelte Claude theme
+
+The WASM API supports arbitrary character symbols. The Studio and standard library use nonempty, variable-width binary words separated by `#`; their public input alphabet is `{ 0, 1, # }` and their public tape alphabet adds blank (`⊔`).
 
 ## Run locally
 

@@ -155,9 +155,6 @@
 .tape-cell.blank-cell { color: var(--muted-foreground); background: color-mix(in oklch, var(--muted) 60%, transparent); }
 .tape-cell.head-cell { color: var(--primary-foreground); border-color: var(--primary); background: var(--primary); transform: translateY(-4px); }
 .tape-cell.head-cell::after { content: 'HEAD'; position: absolute; bottom: -19px; color: var(--primary); font: 600 9px var(--font-mono); }
-.tape-cell:disabled { cursor: default; opacity: 1; }
-.tape-cell:focus-visible { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 20%, transparent); }
-
 .tooltip { position: relative; display: inline-flex; cursor: help; }
 .tooltip::after {
   content: attr(data-tooltip);

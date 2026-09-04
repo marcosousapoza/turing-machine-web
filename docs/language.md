@@ -76,16 +76,16 @@ Each `.tm` file contains exactly one program or function. Imports name functions
 ```tm
 model sipser-3e;
 
-/// Negates a binary word twice.
-program DoubleNot;
+/// Moves to the next word, then returns to the first.
+program RoundTrip;
 
-import "lib/logic/not.tm" as first;
-import "lib/logic/not.tm" as second;
+import "lib/primitives/next-word.tm" as next;
+import "lib/primitives/previous-word.tm" as previous;
 
-include first.start as q0;
-include first.accept as q1;
-include second.start as q1;
-include second.accept as q_accept;
+include next.start as q0;
+include next.accept as q1;
+include previous.start as q1;
+include previous.accept as q_accept;
 
 pause q1;
 
@@ -113,9 +113,6 @@ Registry paths encode categories:
 
 ```text
 lib/
-  logic/
-  math/
-  predicates/
   primitives/
 ```
 
@@ -127,27 +124,40 @@ Lines beginning with `///` attach Markdown documentation to the following `progr
 
 ```tm
 /// ## Contract
-/// Reads two binary words beginning at the head.
+/// Deletes the current word and separator.
 ///
-/// Writes the result into the next word and moves the head there.
-function And32;
+/// Compacts later words and moves the head to the next word.
+function DeleteWord;
 ```
 
 Machine and current-state documentation opens in a sanitized Markdown dialog. Use `//` for comments that should not become documentation.
 
-## Tape editing
+## Tape input
 
-The visual tape is the input editor. Click a cell to cycle through blank and the symbols known from the current transition table; focus a cell and type any character to set it directly. Delete or Backspace writes blank. Pasting writes arbitrary characters beginning at the focused cell, including whitespace. Shift-click places the initial head for function contracts that begin away from cell zero. Editing stops and resets execution, and the edited tape and head become the baseline used by Reset.
+The Studio accepts encoded binary and hexadecimal words. Every word requires a prefix and trailing separator:
+
+```text
+tape = (binary | hexadecimal)*
+binary = "b" [01]+ "#"
+hexadecimal = "x" [0-9a-fA-F]+ "#"
+```
+
+For example, `xFFFF#b0011#` expands to `1111111111111111#0011#`. Each hexadecimal digit always contributes four bits, so leading zeroes and word widths are preserved. An empty field creates a blank tape. Whitespace, unprefixed words, empty words, missing separators, and invalid digits are rejected.
+
+The Head cell field is a zero-based index into the expanded tape. Apply tape validates both fields and establishes the baseline used by Reset. The notation remains exactly as entered after it is applied. Rendered tape cells are read-only.
 
 The viewport follows the head automatically and renders only 17 cells, centered on the head except near the tape's left endpoint. Editing is disabled while the machine runs.
 
-## Registry word ABI
+## Standard library
 
-Some registry functions define their own fixed-width binary contracts. Those contracts belong to the individual programs and do not constrain the runtime's symbol alphabet.
+The standard library uses nonempty, variable-width, MSB-first words matching `[01]+#`. Its public input alphabet is `{ 0, 1, # }`; its successful output alphabet adds blank (`⊔`). Implementations may use private marker characters while running, but remove them before accepting. This restriction applies to library contracts and the Studio tape parser, not to the lower-level WASM API.
 
-Unary transforming operations such as NOT and increment update the word under the head and return to its most-significant bit. Binary operations read two adjacent words, preserve the first, write the result into the second, and finish on the second word's most-significant bit. This allows subsequent binary operations to consume the result and the following word without moving existing tape data. Predicates and navigation primitives define their head movement in their individual contracts.
+- `NextWord` validates the current and next words and stops on the next word's MSB.
+- `PreviousWord` stops on the preceding word's MSB and rejects when no preceding word exists.
+- `ValidateWord` validates the current word and stops immediately after its separator.
+- `DeleteWord` removes the current word and separator, compacts later words, and stops where the deleted word began.
 
-The `lib/primitives/` category provides functions for moving to adjacent words, clearing a word, and validating word width.
+The library currently provides structural primitives only. Arithmetic and logical operations are intentionally left for later layers built from these contracts.
 
 ## Execution
 
